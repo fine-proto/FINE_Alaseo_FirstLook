@@ -2168,11 +2168,13 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
  const label=el=>{for(let n=el,i=0;n&&n.id!=='screen'&&i<5;n=n.parentElement,i++){const t=(n.getAttribute('aria-label')||n.innerText||n.value||n.placeholder||'').replace(/\s+/g,' ').trim();if(t)return t.slice(0,28)}return '아이콘'};
  const isTap=el=>{let hit=null;for(let n=el;n&&n.id!=='screen';n=n.parentElement){if(/^(BUTTON|A|INPUT|TEXTAREA|SELECT|LABEL)$/.test(n.tagName)||n.hasAttribute('data-go')||n.onclick)return n;if(!hit&&n instanceof HTMLElement&&getComputedStyle(n).cursor==='pointer')hit=n}return hit};
  const allowed=el=>el.closest('#tabbar')||el.closest('#nhDots')||el.closest('.island')||el.closest('.ft-hot')||el.closest('.ft-sheet')||el.closest('.ft-start');
- const MSG='첫인상 테스트에서는 이 화면까지만 볼 수 있어요';
+ const MSG='첫 인상 테스트에서는 지원하지 않습니다.';
+ /* 안내 토스트: 1초만 노출 */
+ const ftToast=m=>{const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),1000)};
  const block=e=>{const t=e.target;if(!(t instanceof Element)||!t.closest('#screen')||allowed(t))return;
   e.preventDefault();e.stopImmediatePropagation();
   if(e.type!=='click')return;const n=isTap(t);if(!n)return;
-  cnt.tap++;add(TABN[cur().id]||cur().id,label(n),'누름');toast(MSG)};
+  cnt.tap++;add(TABN[cur().id]||cur().id,label(n),'누름');ftToast(MSG)};
  ['click','dblclick','contextmenu','submit'].forEach(ev=>window.addEventListener(ev,block,true));   // window 캡처: 앱의 다른 클릭 처리보다 먼저 막음
  /* 모바일 진행자 기록: 다이내믹 아일랜드 3번 탭 */
  document.getElementById('screen').insertAdjacentHTML('beforeend','<div class="ft-hot" aria-hidden="true"></div>');
@@ -2187,7 +2189,7 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
  new MutationObserver(()=>{const tr=document.getElementById('nhTrack');if(tr&&!lastIdx.has(tr))setTimeout(()=>{if(!lastIdx.has(tr))lastIdx.set(tr,Math.round(tr.scrollLeft/tr.clientWidth))},400)}).observe(document.getElementById('pages'),{childList:true,subtree:true});
  document.addEventListener('focusin',e=>{const t=e.target;if(t.closest&&t.closest('#screen')&&!t.closest('.ft-start')&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))t.blur()},true);
  /* 혹시 다른 경로로 2뎁스가 열려도 탭 메인 화면으로 되돌림 */
- const _go=go;go=function(id,p,...r){if(TABN[id])return _go(id,p,...r);toast(MSG)};
+ const _go=go;go=function(id,p,...r){if(TABN[id])return _go(id,p,...r);ftToast(MSG)};
  window.FT={log,cnt,add,drawLog,openSheet,TABN,stamp};
 })();
 
@@ -2195,7 +2197,7 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
 (()=>{
  const URL='https://script.google.com/macros/s/AKfycbwFQZERIssKE0oGbF6uwZH8OQglamE_V3oXrEyMM4pIr2tuuqxE9sYun5kFz3QU0bh9/exec';
  const F=window.FT,KEY='ft_session';
- let sess=null,queue=[],dirty=false,lastOk='',sending=false;
+ let sess=null,queue=[],dirty=false,lastOk='',lastErr='',sending=false;
  document.head.insertAdjacentHTML('beforeend',`<style>
   .ft-start{position:absolute;inset:0;z-index:450;background:#F4F6FB;display:flex;flex-direction:column;justify-content:center;padding:0 28px}
   .ft-start h2{font-size:22px;font-weight:900;color:#20262D;margin:0 0 8px;line-height:30px}
@@ -2212,17 +2214,20 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
  const save=()=>{try{sessionStorage.setItem(KEY,JSON.stringify({sess,cnt:F.cnt,log:F.log,queue}))}catch(_){}};
  const ua=()=>(matchMedia('(max-width:760px)').matches?'모바일':'PC')+' · '+innerWidth+'×'+innerHeight;
  const payload=evs=>JSON.stringify({sid:sess.sid,name:sess.name,start:sess.start,end:sess.end||'',swipe:F.cnt.swipe,right:F.cnt.right,left:F.cnt.left,tap:F.cnt.tap,ua:ua(),events:evs.map(e=>({t:e.full,s:e.s,k:e.k,l:e.l}))});
- const who=()=>sess?`테스터 <b>${sess.name}</b> · 시작 ${sess.start.slice(11)}<br>${queue.length?`전송 대기 ${queue.length}건`:lastOk?`시트 전송 ${lastOk}`:'보낼 기록 없음'}`:'진행 중인 테스터 없음';
+ const who=()=>sess?`테스터 <b>${sess.name}</b> · 시작 ${sess.start.slice(11)}<br>${lastErr?`<span style="color:#D92D20">시트 저장 확인 실패 ${lastErr}</span><br>`:''}${queue.length?`전송 대기 ${queue.length}건`:lastOk?`시트 저장 확인 ${lastOk}`:'보낼 기록 없음'}`:'진행 중인 테스터 없음';
  const drawWho=()=>{document.querySelectorAll('.ft-who').forEach(w=>w.innerHTML=who())};
  /* 전송: 5초마다 새 기록을 묶어서 보냄(text/plain → 사전 확인 요청 없이 전송) */
  const flush=()=>{if(!sess||sending||(!queue.length&&!dirty))return;const evs=queue.slice();sending=true;dirty=false;
-  fetch(URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload(evs)})
-   .then(()=>{queue.splice(0,evs.length);lastOk=F.stamp().slice(11);save()})
-   .catch(()=>{dirty=true})
+  fetch(URL,{method:'POST',body:payload(evs)})   // 문자열 본문 = text/plain(사전 요청 없음) · 응답으로 저장 여부 확인
+   .then(r=>r.json()).then(d=>{if(!d||!d.ok)throw 0;queue.splice(0,evs.length);lastOk=F.stamp().slice(11);lastErr='';save()})
+   .catch(()=>{queue.splice(0,evs.length);lastErr=F.stamp().slice(11);save()})   // 응답 확인 실패(권한·배포 문제 가능) — 중복 방지를 위해 재전송하지 않음
    .finally(()=>{sending=false;drawWho()})};
  setInterval(flush,5000);
- const beacon=()=>{if(!sess||(!queue.length&&!dirty))return;try{navigator.sendBeacon(URL,new Blob([payload(queue)],{type:'text/plain;charset=utf-8'}));queue.length=0;save()}catch(_){}};
- addEventListener('pagehide',beacon);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')beacon()});
+ /* 페이지를 나가거나 다른 앱으로 넘어가면 '이탈'로 기록하고 종료 시각 저장, 다시 돌아오면 '복귀'로 이어서 진행 */
+ let away=false;
+ const leave=()=>{if(!sess||away)return;away=true;F.add('이탈','페이지를 나감(창 닫기·다른 앱 이동)','이탈');sess.end=F.stamp();try{navigator.sendBeacon(URL,new Blob([payload(queue)],{type:'text/plain;charset=utf-8'}));queue.length=0}catch(_){}save()};
+ const resume=()=>{if(!sess||!away)return;away=false;sess.end='';F.add('복귀','페이지로 돌아옴','복귀');flush()};
+ addEventListener('pagehide',leave);document.addEventListener('visibilitychange',()=>{document.visibilityState==='hidden'?leave():resume()});
  window.FT_onEvent=e=>{if(!sess)return;queue.push(e);save();drawWho()};
  /* 탭 이동 기록 */
  addEventListener('click',e=>{const t=e.target instanceof Element&&e.target.closest('#tabbar .t');if(!t||!sess)return;const i=[...t.parentElement.children].indexOf(t),id=TABS.at(i)&&TABS.at(i).id;if(id)F.add(F.TABN[id],`탭 이동 → ${F.TABN[id]}`,'탭 이동')},true);
