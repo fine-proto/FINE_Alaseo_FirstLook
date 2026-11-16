@@ -2251,6 +2251,31 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
  drawWho();
 })();
 
+/* ================= 첫인상테스트용 · PC 접속 차단 (11.16) =================
+   PC(넓은 화면 + 마우스)에서 열면 홈 화면을 흐린 배경으로 두고 '모바일에서만 참여' 안내만 표시. 진행자 화면·시작 화면 숨김 */
+(()=>{
+ const isPC=matchMedia('(min-width:760px)').matches&&!matchMedia('(pointer:coarse)').matches;
+ if(!isPC)return;
+ document.head.insertAdjacentHTML('beforeend',`<style>
+  body.ft-pc .ft-panel,body.ft-pc .ft-start,body.ft-pc .ft-hot{display:none!important}
+  .ft-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(244,246,251,.55);-webkit-backdrop-filter:blur(14px) saturate(120%);backdrop-filter:blur(14px) saturate(120%)}
+  .ft-gate .card{width:380px;max-width:calc(100vw - 32px);background:#fff;border-radius:24px;padding:32px 28px;text-align:center;box-shadow:0 20px 50px rgba(17,19,24,.14);color:#20262D}
+  .ft-gate .ic{width:56px;height:56px;border-radius:16px;background:#FFF1E8;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  .ft-gate h2{font-size:20px;font-weight:900;margin:0 0 8px;line-height:28px}
+  .ft-gate p{font-size:14px;color:#6B7684;line-height:21px;margin:0}
+  .ft-gate .qr{width:148px;height:148px;margin:20px auto 8px;padding:8px;border:1px solid #E5E8EB;border-radius:14px;display:flex;align-items:center;justify-content:center}
+  .ft-gate .qr img,.ft-gate .qr canvas{width:132px!important;height:132px!important}
+  .ft-gate small{display:block;font-size:12px;color:#8A939E}
+ </style>`);
+ document.body.classList.add('ft-pc');
+ document.body.insertAdjacentHTML('beforeend',`<div class="ft-gate" role="dialog" aria-label="모바일에서만 참여할 수 있어요"><div class="card"><div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></div><h2>모바일에서만 참여할 수 있어요</h2><p>FINE Alaseo 첫인상 테스트는<br>휴대폰에서 진행해 주세요.<br>휴대폰 카메라로 아래 QR 코드를 찍으면 바로 열려요.</p><div class="qr" id="ftQr"></div><small>QR 코드가 안 보이면 이 주소를 휴대폰에서 열어 주세요</small><small style="margin-top:4px;color:#20262D;word-break:break-all">${location.href.split('#')[0]}</small></div></div>`);
+ /* 화면 뒤 홈 조작 막기 */
+ ['click','pointerdown','keydown','wheel','touchstart'].forEach(ev=>window.addEventListener(ev,e=>{if(!e.target.closest||!e.target.closest('.ft-gate'))e.stopImmediatePropagation()},true));
+ const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+ s.onload=()=>{try{new QRCode(document.getElementById('ftQr'),{text:location.href.split('#')[0],width:132,height:132,correctLevel:QRCode.CorrectLevel.M})}catch(_){document.getElementById('ftQr').style.display='none'}};
+ s.onerror=()=>{document.getElementById('ftQr').style.display='none'};document.head.appendChild(s);
+})();
+
 render('fade');
 
 </script>
