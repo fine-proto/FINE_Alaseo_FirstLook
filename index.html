@@ -2212,7 +2212,24 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-zone]')&&cur().
   .ft-end{height:36px;border-radius:10px;border:0;background:#20262D;color:#fff;font-size:12.5px;font-weight:700;width:100%;cursor:pointer;margin-top:8px}
  </style>`);
  const save=()=>{try{sessionStorage.setItem(KEY,JSON.stringify({sess,cnt:F.cnt,log:F.log,queue}))}catch(_){}};
- const ua=()=>(matchMedia('(max-width:760px)').matches?'모바일':'PC')+' · '+innerWidth+'×'+innerHeight;
+ /* 테스터 기기 정보(입력 없이 브라우저가 알려 주는 범위까지) → 시트 '기기' 칸
+    · 안드로이드(크롬·삼성 인터넷): 모델 코드 + 안드로이드 버전(User-Agent Client Hints)
+    · 아이폰: 정확한 기종은 웹에서 알 수 없어 화면 크기로 기종 그룹 추정 + iOS 버전(사파리는 실제보다 낮게 고정될 수 있음) */
+ const SAMSUNG=[['SM-S93','Galaxy S25'],['SM-S92','Galaxy S24'],['SM-S91','Galaxy S23'],['SM-S90','Galaxy S22'],['SM-F96','Galaxy Z Fold7'],['SM-F95','Galaxy Z Fold6'],['SM-F94','Galaxy Z Fold5'],['SM-F76','Galaxy Z Flip7'],['SM-F74','Galaxy Z Flip6'],['SM-F73','Galaxy Z Flip5'],['SM-A56','Galaxy A56'],['SM-A55','Galaxy A55'],['SM-A36','Galaxy A36'],['SM-A35','Galaxy A35'],['SM-A26','Galaxy A26'],['SM-A25','Galaxy A25'],['SM-A16','Galaxy A16'],['SM-A15','Galaxy A15']];
+ const galaxy=m=>{const c=(m||'').toUpperCase();const f=SAMSUNG.find(x=>c.startsWith(x[0]));if(!f)return m;const t=c.charAt(f[0].length);const suf=/^SM-S/.test(c)?({'1':'',' ':'','6':'+','8':' Ultra','7':' Edge','0':''}[t]??''):'';return `${f[1]}${suf}(${m})`};
+ const IPHONE=[[440,956,3,'iPhone 16 Pro Max·17 Pro Max'],[420,912,3,'iPhone Air'],[402,874,3,'iPhone 16 Pro·17·17 Pro'],[430,932,3,'iPhone 14 Pro Max·15 Plus·15 Pro Max·16 Plus'],[393,852,3,'iPhone 14 Pro·15·15 Pro·16·16e'],[428,926,3,'iPhone 12 Pro Max·13 Pro Max·14 Plus'],[390,844,3,'iPhone 12·13·14(Pro 포함)·16e'],[375,812,3,'iPhone X·XS·11 Pro·12 mini·13 mini'],[414,896,3,'iPhone XS Max·11 Pro Max'],[414,896,2,'iPhone XR·11'],[375,667,2,'iPhone SE(2·3세대)·6~8'],[414,736,3,'iPhone 6~8 Plus']];
+ const browser=u=>/KAKAOTALK/i.test(u)?'카카오톡 앱 내':/NAVER\(inapp/i.test(u)?'네이버 앱 내':/SamsungBrowser/i.test(u)?'삼성 인터넷':/CriOS/i.test(u)?'크롬(iOS)':/FxiOS|Firefox/i.test(u)?'파이어폭스':/EdgiOS|Edg\//i.test(u)?'엣지':/Chrome\//i.test(u)?'크롬':/Safari/i.test(u)?'사파리':'기타';
+ let DEV='';
+ const scr=()=>{const w=Math.min(screen.width,screen.height),h=Math.max(screen.width,screen.height),r=Math.round((devicePixelRatio||1)*100)/100;return {w,h,r,txt:`${w}×${h}@${r}`}};
+ const detect=async()=>{const u=navigator.userAgent,s=scr();let model='',os='';
+  try{if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){const v=await navigator.userAgentData.getHighEntropyValues(['model','platformVersion','platform']);if(v.platform==='Android'){model=v.model?galaxy(v.model):'Android 기기';os='Android '+(v.platformVersion||'').split('.')[0]}}}catch(_){}
+  {const a=u.match(/Android\s([\d.]+)(?:;\s([^;)]+))?/);if(a){if(!os)os='Android '+a[1];if(!model||model==='Android 기기')model=a[2]&&a[2].trim()!=='K'?galaxy(a[2].trim()):'Android 기기'}}
+  if(!os&&/iPhone/.test(u)){const i=u.match(/OS (\d+)_(\d+)/);os=i?`iOS ${i[1]}.${i[2]}`:'iOS';const f=IPHONE.find(x=>x[0]===s.w&&x[1]===s.h&&x[2]===Math.round(s.r));model=f?`${f[3]} 추정`:'iPhone(기종 미확인)'}
+  if(!os&&(/iPad/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))){const i=u.match(/OS (\d+)_(\d+)/)||u.match(/Version\/(\d+)\.(\d+)/);os=i?`iPadOS ${i[1]}.${i[2]}`:'iPadOS';model='iPad'}
+  if(!os){os=/Windows/.test(u)?'Windows':/Mac OS X/.test(u)?'macOS':'기타 OS';model='PC'}
+  DEV=`${model} · ${os} · ${s.txt} · ${browser(u)}`;return DEV};
+ detect();
+ const ua=()=>DEV||(()=>{const s=scr();return `기기 확인 중 · ${s.txt} · ${browser(navigator.userAgent)}`})();
  const payload=evs=>JSON.stringify({sid:sess.sid,name:sess.name,start:sess.start,end:sess.end||'',swipe:F.cnt.swipe,right:F.cnt.right,left:F.cnt.left,tap:F.cnt.tap,ua:ua(),events:evs.map(e=>({t:e.full,s:e.s,k:e.k,l:e.l}))});
  const who=()=>sess?`테스터 <b>${sess.name}</b> · 시작 ${sess.start.slice(11)}<br>${lastErr?`<span style="color:#D92D20">시트 저장 확인 실패 ${lastErr}</span><br>`:''}${queue.length?`전송 대기 ${queue.length}건`:lastOk?`시트 저장 확인 ${lastOk}`:'보낼 기록 없음'}`:'진행 중인 테스터 없음';
  const drawWho=()=>{document.querySelectorAll('.ft-who').forEach(w=>w.innerHTML=who())};
